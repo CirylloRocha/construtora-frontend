@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gestão Financeira</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1>📊 Dashboard Financeiro</h1>
+        </div>
+        <div class="header-right">
+            <button id="toggleTheme" class="btn btn-secondary" title="Alternar tema">
+                🌙 Modo Escuro
+            </button>
+            <button id="logout" class="btn btn-danger" title="Sair">
+                🚪 Sair
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li><a href="dashboard.html" class="active">📊 Dashboard</a></li>
+            <li><a href="novo-transacao.html">➕ Nova Transação</a></li>
+            <li><a href="transacoes.html">📋 Transações</a></li>
+            <li><a href="importar-pdf.html">📄 Importar PDF</a></li>
+            <li><a href="relatorios.html">📈 Relatórios</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Summary Cards -->
+        <section class="summary-section">
+            <h2>Resumo do Mês</h2>
+            <div class="cards-grid">
+                <div class="card card-receita">
+                    <div class="card-icon">💰</div>
+                    <div class="card-content">
+                        <h3>Receitas</h3>
+                        <p class="card-value" id="totalReceita">R$ 0,00</p>
+                        <small id="receitaChange">+0% vs mês anterior</small>
+                    </div>
+                </div>
+
+                <div class="card card-despesa">
+                    <div class="card-icon">💸</div>
+                    <div class="card-content">
+                        <h3>Despesas</h3>
+                        <p class="card-value" id="totalDespesa">R$ 0,00</p>
+                        <small id="despesaChange">+0% vs mês anterior</small>
+                    </div>
+                </div>
+
+                <div class="card card-saldo">
+                    <div class="card-icon">💵</div>
+                    <div class="card-content">
+                        <h3>Saldo</h3>
+                        <p class="card-value" id="totalSaldo">R$ 0,00</p>
+                        <small id="saldoChange">+0% vs mês anterior</small>
+                    </div>
+                </div>
+
+                <div class="card card-alerta">
+                    <div class="card-icon">⚠️</div>
+                    <div class="card-content">
+                        <h3>Alertas</h3>
+                        <p class="card-value" id="totalAlertas">0</p>
+                        <small>Parcelas vencidas</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Latest Transactions -->
+        <section class="transactions-section">
+            <div class="section-header">
+                <h2>Últimas Transações</h2>
+                <a href="transacoes.html" class="btn btn-secondary">Ver Todas</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Obra</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transacoesRecentes">
+                        <tr>
+                            <td colspan="6" class="text-center">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Alerts Section -->
+        <section class="alerts-section">
+            <h2>Alertas Importantes</h2>
+            <div id="alertasContainer" class="alerts-container">
+                <p class="text-center">Nenhum alerta no momento</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Inicializar dashboard
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadDashboardData();
+            setupEventListeners();
+        });
+
+        async function loadDashboardData() {
+            try {
+                const currentMonth = new Date();
+                const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+                const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+                // Buscar transações do mês
+                const { data: transacoes, error } = await db.getTransacoesPorPeriodo(
+                    firstDay.toISOString().split('T')[0],
+                    lastDay.toISOString().split('T')[0]
+                );
+
+                if (error) throw error;
+
+                // Calcular totais
+                let totalReceita = 0;
+                let totalDespesa = 0;
+
+                transacoes.forEach(t => {
+                    if (t.categorias?.tipo === 'receita') {
+                        totalReceita += t.valor;
+                    } else {
+                        totalDespesa += t.valor;
+                    }
+                });
+
+                const saldo = totalReceita - totalDespesa;
+
+                // Atualizar cards
+                document.getElementById('totalReceita').textContent = formatCurrency(totalReceita);
+                document.getElementById('totalDespesa').textContent = formatCurrency(totalDespesa);
+                document.getElementById('totalSaldo').textContent = formatCurrency(saldo);
+
+                // Atualizar tabela de transações recentes
+                const recentes = transacoes.slice(0, 5);
+                const tbody = document.getElementById('transacoesRecentes');
+                tbody.innerHTML = recentes.map(t => `
+                    <tr>
+                        <td>${formatDate(t.data_transacao)}</td>
+                        <td>${t.descricao}</td>
+                        <td>${t.obras?.codigo || '-'}</td>
+                        <td>${t.categorias?.nome || '-'}</td>
+                        <td class="${t.categorias?.tipo === 'receita' ? 'text-success' : 'text-danger'}">
+                            ${t.categorias?.tipo === 'receita' ? '+' : '-'} ${formatCurrency(t.valor)}
+                        </td>
+                        <td><span class="badge badge-${t.status}">${t.status}</span></td>
+                    </tr>
+                `).join('');
+
+                // Carregar alertas
+                await loadAlertas();
+
+            } catch (error) {
+                console.error('Erro ao carregar dashboard:', error);
+                showAlert('Erro ao carregar dados do dashboard', 'danger');
+            }
+        }
+
+        async function loadAlertas() {
+            try {
+                const { data: parcelas, error } = await db.getParcelasVencidas();
+                if (error) throw error;
+
+                const container = document.getElementById('alertasContainer');
+                document.getElementById('totalAlertas').textContent = parcelas.length;
+
+                if (parcelas.length === 0) {
+                    container.innerHTML = '<p class="text-center">Nenhum alerta no momento</p>';
+                    return;
+                }
+
+                container.innerHTML = parcelas.map(p => `
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Parcela Vencida:</strong> ${p.transacoes?.descricao} 
+                        (${p.numero_parcela}/${p.transacoes?.numero_parcelas}) 
+                        - Vencimento: ${formatDate(p.data_vencimento)}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Erro ao carregar alertas:', error);
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('toggleTheme').addEventListener('click', toggleTheme);
+            document.getElementById('logout').addEventListener('click', logout);
+        }
+    </script>
+</body>
+</html>

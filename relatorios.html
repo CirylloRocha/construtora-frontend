@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Gestão Financeira</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h1>📈 Relatórios</h1>
+        </div>
+        <div class="header-right">
+            <button id="toggleTheme" class="btn btn-secondary">🌙 Modo Escuro</button>
+            <button id="logout" class="btn btn-danger">🚪 Sair</button>
+        </div>
+    </header>
+
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li><a href="dashboard.html">📊 Dashboard</a></li>
+            <li><a href="novo-transacao.html">➕ Nova Transação</a></li>
+            <li><a href="transacoes.html">📋 Transações</a></li>
+            <li><a href="importar-pdf.html">📄 Importar PDF</a></li>
+            <li><a href="relatorios.html" class="active">📈 Relatórios</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <!-- Período Selecionável -->
+        <section class="period-section">
+            <h2>Período</h2>
+            <div class="period-controls">
+                <input type="month" id="periodMes">
+                <button id="btnCarregarRelatorio" class="btn btn-primary">🔄 Carregar</button>
+                <button id="btnExportarPdf" class="btn btn-secondary">📥 Exportar PDF</button>
+            </div>
+        </section>
+
+        <!-- Gráfico de Fluxo de Caixa -->
+        <section class="chart-section">
+            <h2>Fluxo de Caixa - Últimos 12 Meses</h2>
+            <div class="chart-container">
+                <canvas id="fluxoCaixaChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Gráfico de Gastos por Categoria -->
+        <section class="chart-section">
+            <h2>Gastos por Categoria</h2>
+            <div class="chart-container">
+                <canvas id="categoriasChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Tabela de Resultado por Obra -->
+        <section class="table-section">
+            <h2>Resultado por Obra</h2>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Orçamento</th>
+                            <th>Receita</th>
+                            <th>Despesa</th>
+                            <th>Saldo</th>
+                            <th>% Utilizado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="relatorioObrasTable">
+                        <tr>
+                            <td colspan="7" class="text-center">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Resumo Financeiro -->
+        <section class="summary-section">
+            <h2>Resumo Financeiro</h2>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>Total de Receitas</h3>
+                    <p class="summary-value" id="totalReceitasRelatorio">R$ 0,00</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Total de Despesas</h3>
+                    <p class="summary-value" id="totalDespesasRelatorio">R$ 0,00</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Saldo Líquido</h3>
+                    <p class="summary-value" id="saldoLiquidoRelatorio">R$ 0,00</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Margem</h3>
+                    <p class="summary-value" id="margemRelatorio">0%</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        let fluxoCaixaChart = null;
+        let categoriasChart = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            setDefaultPeriod();
+            await loadRelatorios();
+            setupEventListeners();
+        });
+
+        function setDefaultPeriod() {
+            const today = new Date();
+            document.getElementById('periodMes').value = today.toISOString().slice(0, 7);
+        }
+
+        async function loadRelatorios() {
+            try {
+                const mes = document.getElementById('periodMes').value;
+                const [ano, mes_num] = mes.split('-');
+
+                // Buscar transações dos últimos 12 meses
+                const transacoes12m = await getTransacoes12Meses();
+                await drawFluxoCaixaChart(transacoes12m);
+
+                // Buscar transações do mês selecionado
+                const { data: transacoesMes } = await db.getTransacoesPorPeriodo(
+                    `${ano}-${mes_num}-01`,
+                    `${ano}-${mes_num}-31`
+                );
+
+                await drawCategoriasChart(transacoesMes);
+                await loadRelatorioObras(transacoesMes);
+                updateSummary(transacoesMes);
+
+            } catch (error) {
+                console.error('Erro ao carregar relatórios:', error);
+                showAlert('Erro ao carregar relatórios', 'danger');
+            }
+        }
+
+        async function getTransacoes12Meses() {
+            const transacoes = [];
+            const hoje = new Date();
+
+            for (let i = 11; i >= 0; i--) {
+                const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+                const ano = data.getFullYear();
+                const mes = String(data.getMonth() + 1).padStart(2, '0');
+                const dataInicio = `${ano}-${mes}-01`;
+                const dataFim = `${ano}-${mes}-31`;
+
+                const { data: trans } = await db.getTransacoesPorPeriodo(dataInicio, dataFim);
+                transacoes.push({
+                    mes: `${mes}/${ano}`,
+                    receita: trans.filter(t => t.categorias?.tipo === 'receita').reduce((a, b) => a + b.valor, 0),
+                    despesa: trans.filter(t => t.categorias?.tipo === 'despesa').reduce((a, b) => a + b.valor, 0)
+                });
+            }
+
+            return transacoes;
+        }
+
+        async function drawFluxoCaixaChart(data) {
+            const ctx = document.getElementById('fluxoCaixaChart').getContext('2d');
+
+            if (fluxoCaixaChart) {
+                fluxoCaixaChart.destroy();
+            }
+
+            fluxoCaixaChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.mes),
+                    datasets: [
+                        {
+                            label: 'Receitas',
+                            data: data.map(d => d.receita),
+                            borderColor: '#52C77A',
+                            backgroundColor: 'rgba(82, 199, 122, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Despesas',
+                            data: data.map(d => d.despesa),
+                            borderColor: '#FF6B6B',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function drawCategoriasChart(transacoes) {
+            const categorias = {};
+
+            transacoes.forEach(t => {
+                if (t.categorias?.tipo === 'despesa') {
+                    const nome = t.categorias.nome;
+                    categorias[nome] = (categorias[nome] || 0) + t.valor;
+                }
+            });
+
+            const ctx = document.getElementById('categoriasChart').getContext('2d');
+
+            if (categoriasChart) {
+                categoriasChart.destroy();
+            }
+
+            categoriasChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categorias),
+                    datasets: [{
+                        data: Object.values(categorias),
+                        backgroundColor: [
+                            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+                            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadRelatorioObras(transacoes) {
+            const { data: obras } = await db.getObras();
+            const tbody = document.getElementById('relatorioObrasTable');
+
+            tbody.innerHTML = obras.map(obra => {
+                const obraTransacoes = transacoes.filter(t => t.obra_id === obra.id);
+                const receita = obraTransacoes
+                    .filter(t => t.categorias?.tipo === 'receita')
+                    .reduce((a, b) => a + b.valor, 0);
+                const despesa = obraTransacoes
+                    .filter(t => t.categorias?.tipo === 'despesa')
+                    .reduce((a, b) => a + b.valor, 0);
+                const saldo = receita - despesa;
+                const percentualUtilizado = obra.orcamento ? ((despesa / obra.orcamento) * 100).toFixed(2) : 0;
+
+                return `
+                    <tr>
+                        <td>${obra.codigo}</td>
+                        <td>${obra.nome}</td>
+                        <td>${formatCurrency(obra.orcamento || 0)}</td>
+                        <td class="text-success">${formatCurrency(receita)}</td>
+                        <td class="text-danger">${formatCurrency(despesa)}</td>
+                        <td class="${saldo >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(saldo)}</td>
+                        <td>${percentualUtilizado}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateSummary(transacoes) {
+            const receita = transacoes
+                .filter(t => t.categorias?.tipo === 'receita')
+                .reduce((a, b) => a + b.valor, 0);
+            const despesa = transacoes
+                .filter(t => t.categorias?.tipo === 'despesa')
+                .reduce((a, b) => a + b.valor, 0);
+            const saldo = receita - despesa;
+            const margem = receita > 0 ? ((saldo / receita) * 100).toFixed(2) : 0;
+
+            document.getElementById('totalReceitasRelatorio').textContent = formatCurrency(receita);
+            document.getElementById('totalDespesasRelatorio').textContent = formatCurrency(despesa);
+            document.getElementById('saldoLiquidoRelatorio').textContent = formatCurrency(saldo);
+            document.getElementById('margemRelatorio').textContent = margem + '%';
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btnCarregarRelatorio').addEventListener('click', loadRelatorios);
+            document.getElementById('btnExportarPdf').addEventListener('click', exportarPdf);
+            document.getElementById('toggleTheme').addEventListener('click', toggleTheme);
+            document.getElementById('logout').addEventListener('click', logout);
+        }
+
+        function exportarPdf() {
+            showAlert('Funcionalidade de exportação em desenvolvimento', 'info');
+            // Implementar com jsPDF
+        }
+    </script>
+</body>
+</html>

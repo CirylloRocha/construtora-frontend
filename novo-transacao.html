@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Transação - Gestão Financeira</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <a href="dashboard.html" class="btn btn-secondary">← Voltar</a>
+            <h1>➕ Nova Transação</h1>
+        </div>
+        <div class="header-right">
+            <button id="toggleTheme" class="btn btn-secondary">🌙 Modo Escuro</button>
+            <button id="logout" class="btn btn-danger">🚪 Sair</button>
+        </div>
+    </header>
+
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li><a href="dashboard.html">📊 Dashboard</a></li>
+            <li><a href="novo-transacao.html" class="active">➕ Nova Transação</a></li>
+            <li><a href="transacoes.html">📋 Transações</a></li>
+            <li><a href="importar-pdf.html">📄 Importar PDF</a></li>
+            <li><a href="relatorios.html">📈 Relatórios</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <section class="form-section">
+            <div class="form-container">
+                <h2>Registrar Nova Transação</h2>
+
+                <form id="transacaoForm" class="form">
+                    <!-- Tipo de Transação -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="tipo">Tipo de Transação *</label>
+                            <select id="tipo" required>
+                                <option value="">Selecione...</option>
+                                <option value="receita">💰 Receita</option>
+                                <option value="despesa">💸 Despesa</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Descrição -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="descricao">Descrição *</label>
+                            <input 
+                                type="text" 
+                                id="descricao" 
+                                placeholder="Ex: Compra de cimento e areia"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Valor -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="valor">Valor (R$) *</label>
+                            <input 
+                                type="number" 
+                                id="valor" 
+                                placeholder="0,00"
+                                step="0.01"
+                                min="0"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Obra -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="obra">Obra *</label>
+                            <select id="obra" required>
+                                <option value="">Carregando...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Categoria -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="categoria">Categoria *</label>
+                            <select id="categoria" required>
+                                <option value="">Carregando...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Instituição -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="instituicao">Instituição Financeira</label>
+                            <select id="instituicao">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Forma de Pagamento -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="formaPagamento">Forma de Pagamento *</label>
+                            <select id="formaPagamento" required>
+                                <option value="">Carregando...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Data -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="data">Data da Transação *</label>
+                            <input type="date" id="data" required>
+                        </div>
+                    </div>
+
+                    <!-- Parcelas -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="numeroParcelas">Número de Parcelas</label>
+                            <input 
+                                type="number" 
+                                id="numeroParcelas" 
+                                value="1"
+                                min="1"
+                                max="12"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Mês Reconhecimento -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="mesReconhecimento">Mês de Reconhecimento (Contábil)</label>
+                            <input type="month" id="mesReconhecimento">
+                        </div>
+                    </div>
+
+                    <!-- Mês Pagamento -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="mesPagamento">Mês de Pagamento (Fluxo de Caixa)</label>
+                            <input type="month" id="mesPagamento">
+                        </div>
+                    </div>
+
+                    <!-- Observações -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="observacoes">Observações</label>
+                            <textarea 
+                                id="observacoes" 
+                                placeholder="Adicione observações sobre esta transação"
+                                rows="4"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="form-row form-actions">
+                        <button type="submit" class="btn btn-primary">✅ Salvar Transação</button>
+                        <button type="reset" class="btn btn-secondary">🔄 Limpar</button>
+                        <a href="transacoes.html" class="btn btn-outline">❌ Cancelar</a>
+                    </div>
+
+                    <!-- Mensagens -->
+                    <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+                    <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadFormOptions();
+            setupFormListeners();
+            setDefaultDate();
+        });
+
+        async function loadFormOptions() {
+            try {
+                // Carregar obras
+                const { data: obras } = await db.getObras();
+                const obraSelect = document.getElementById('obra');
+                obraSelect.innerHTML = '<option value="">Selecione uma obra...</option>' +
+                    obras.map(o => `<option value="${o.id}">${o.codigo} - ${o.nome}</option>`).join('');
+
+                // Carregar categorias
+                const { data: categorias } = await db.getCategorias();
+                const categoriaSelect = document.getElementById('categoria');
+                categoriaSelect.innerHTML = '<option value="">Selecione uma categoria...</option>' +
+                    categorias.map(c => `<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('');
+
+                // Carregar instituições
+                const { data: instituicoes } = await db.getInstituicoes();
+                const instituicaoSelect = document.getElementById('instituicao');
+                instituicaoSelect.innerHTML = '<option value="">Selecione...</option>' +
+                    instituicoes.map(i => `<option value="${i.id}">${i.nome}</option>`).join('');
+
+                // Carregar formas de pagamento
+                const { data: formas } = await db.getFormasPagamento();
+                const formaSelect = document.getElementById('formaPagamento');
+                formaSelect.innerHTML = '<option value="">Selecione...</option>' +
+                    formas.map(f => `<option value="${f.id}">${f.icone} ${f.nome}</option>`).join('');
+
+            } catch (error) {
+                console.error('Erro ao carregar opções:', error);
+                showAlert('Erro ao carregar dados do formulário', 'danger');
+            }
+        }
+
+        function setDefaultDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('data').value = today;
+            document.getElementById('mesReconhecimento').value = new Date().toISOString().slice(0, 7);
+            document.getElementById('mesPagamento').value = new Date().toISOString().slice(0, 7);
+        }
+
+        function setupFormListeners() {
+            document.getElementById('transacaoForm').addEventListener('submit', handleFormSubmit);
+            document.getElementById('numeroParcelas').addEventListener('change', updateParcelaInfo);
+            document.getElementById('toggleTheme').addEventListener('click', toggleTheme);
+            document.getElementById('logout').addEventListener('click', logout);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            try {
+                const user = await getAuthUser();
+                const formData = {
+                    numero_transacao: `TRX.${Date.now()}`,
+                    descricao: document.getElementById('descricao').value,
+                    valor: parseFloat(document.getElementById('valor').value),
+                    numero_parcelas: parseInt(document.getElementById('numeroParcelas').value) || 1,
+                    valor_parcela: parseFloat(document.getElementById('valor').value) / (parseInt(document.getElementById('numeroParcelas').value) || 1),
+                    data_transacao: document.getElementById('data').value,
+                    mes_reconhecimento: document.getElementById('mesReconhecimento').value + '-01',
+                    mes_pagamento: document.getElementById('mesPagamento').value + '-01',
+                    categoria_id: document.getElementById('categoria').value,
+                    forma_pagamento_id: document.getElementById('formaPagamento').value,
+                    instituicao_id: document.getElementById('instituicao').value || null,
+                    obra_id: document.getElementById('obra').value,
+                    colaborador_id: user.id,
+                    criado_por: user.id,
+                    status: 'registrada',
+                    observacoes: document.getElementById('observacoes').value
+                };
+
+                const { data, error } = await db.insertTransacao(formData);
+                if (error) throw error;
+
+                // Criar parcelas se for mais de 1
+                if (formData.numero_parcelas > 1) {
+                    const parcelas = [];
+                    const dataPagamento = new Date(document.getElementById('mesPagamento').value + '-01');
+
+                    for (let i = 1; i &lt;= formData.numero_parcelas; i++) {
+                        const dataVencimento = new Date(dataPagamento);
+                        dataVencimento.setMonth(dataVencimento.getMonth() + i);
+                        
+                        parcelas.push({
+                            numero_parcela: i,
+                            valor: formData.valor_parcela,
+                            data_vencimento: dataVencimento.toISOString().split('T')[0],
+                            status: 'pendente'
+                        });
+                    }
+
+                    for (const parcela of parcelas) {
+                        await db.insertParcela(data.id, parcela);
+                    }
+                }
+
+                showAlert('✅ Transação registrada com sucesso!', 'success');
+                document.getElementById('transacaoForm').reset();
+                setDefaultDate();
+                
+                setTimeout(() => {
+                    window.location.href = 'transacoes.html';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Erro ao salvar transação:', error);
+                showAlert('Erro ao salvar transação: ' + error.message, 'danger');
+            }
+        }
+
+        function updateParcelaInfo() {
+            const numeroParcelas = parseInt(document.getElementById('numeroParcelas').value) || 1;
+            const valor = parseFloat(document.getElementById('valor').value) || 0;
+            const valorParcela = valor / numeroParcelas;
+            
+            if (numeroParcelas > 1) {
+                showAlert(`Será criado em ${numeroParcelas} parcelas de R$ ${formatCurrency(valorParcela)}`, 'info');
+            }
+        }
+    </script>
+</body>
+</html>
+                    
+                 

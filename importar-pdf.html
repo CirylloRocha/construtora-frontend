@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar PDF - Gestão Financeira</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h1>📄 Importar Extrato PDF</h1>
+        </div>
+        <div class="header-right">
+            <button id="toggleTheme" class="btn btn-secondary">🌙 Modo Escuro</button>
+            <button id="logout" class="btn btn-danger">🚪 Sair</button>
+        </div>
+    </header>
+
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li><a href="dashboard.html">📊 Dashboard</a></li>
+            <li><a href="novo-transacao.html">➕ Nova Transação</a></li>
+            <li><a href="transacoes.html">📋 Transações</a></li>
+            <li><a href="importar-pdf.html" class="active">📄 Importar PDF</a></li>
+            <li><a href="relatorios.html">📈 Relatórios</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <section class="import-section">
+            <div class="import-container">
+                <h2>Importar Extrato Bancário</h2>
+
+                <!-- Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <h3>Arraste o PDF aqui ou clique para selecionar</h3>
+                    <p>Formatos aceitos: PDF</p>
+                    <input 
+                        type="file" 
+                        id="pdfFile" 
+                        accept=".pdf" 
+                        style="display: none;"
+                    >
+                </div>
+
+                <!-- Preview -->
+                <div id="previewSection" style="display: none;">
+                    <h3>Preview das Transações Extraídas</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Valor</th>
+                                    <th>Tipo</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTable">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="btnConfirmarImportacao" class="btn btn-primary">✅ Confirmar Importação</button>
+                        <button id="btnNovoArquivo" class="btn btn-secondary">📄 Novo Arquivo</button>
+                    </div>
+                </div>
+
+                <!-- Mensagens -->
+                <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+                <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                <div id="loadingMessage" class="alert alert-info" style="display: none;">
+                    ⏳ Processando PDF...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        let extractedTransacoes = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            setupUploadArea();
+            setupEventListeners();
+        });
+
+        function setupUploadArea() {
+            const uploadArea = document.getElementById('uploadArea');
+            const pdfFile = document.getElementById('pdfFile');
+
+            uploadArea.addEventListener('click', () => pdfFile.click());
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#007bff';
+                uploadArea.style.backgroundColor = '#f0f8ff';
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.style.borderColor = '#ddd';
+                uploadArea.style.backgroundColor = '#fff';
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#ddd';
+                uploadArea.style.backgroundColor = '#fff';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handlePdfUpload(files[0]);
+                }
+            });
+
+            pdfFile.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handlePdfUpload(e.target.files[0]);
+                }
+            });
+        }
+
+        async function handlePdfUpload(file) {
+            if (file.type !== 'application/pdf') {
+                showAlert('Por favor, selecione um arquivo PDF válido', 'danger');
+                return;
+            }
+
+            try {
+                showAlert('⏳ Processando PDF...', 'info');
+                const text = await extractTextFromPdf(file);
+                extractedTransacoes = parseTransacoesFromText(text);
+
+                if (extractedTransacoes.length === 0) {
+                    showAlert('Nenhuma transação encontrada no PDF', 'warning');
+                    return;
+                }
+
+                displayPreview();
+                showAlert(`✅ ${extractedTransacoes.length} transações extraídas!`, 'success');
+
+            } catch (error) {
+                console.error('Erro ao processar PDF:', error);
+                showAlert('Erro ao processar PDF: ' + error.message, 'danger');
+            }
+        }
+
+        async function extractTextFromPdf(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const pdf = await pdfjsLib.getDocument(e.target.result).promise;
+                        let text = '';
+
+                        for (let i = 1; i &lt;= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            text += content.items.map(item => item.str).join(' ') + '\n';
+                        }
+
+                        resolve(text);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parseTransacoesFromText(text) {
+            const transacoes = [];
+            
+            // Padrão simples para extrair transações
+            // Você pode melhorar isso com regex mais específicos para cada banco
+            const linhas = text.split('\n');
+            
+            linhas.forEach(linha => {
+                // Procura por padrões de data (DD/MM/YYYY ou DD/MM)
+                const dateMatch = linha.match(/(\d{1,2}\/\d{1,2}(?:\/\d{4})?)/);
+                // Procura por valores (números com vírgula ou ponto)
+                const valueMatch = linha.match(/R?\$?\s*([\d.,]+)/);
+                
+                if (dateMatch && valueMatch) {
+                    const descricao = linha.replace(dateMatch[0], '').replace(valueMatch[0], '').trim();
+                    
+                    if (descricao.length > 0) {
+                        transacoes.push({
+                            data: dateMatch[1],
+                            descricao: descricao.substring(0, 100),
+                            valor: parseFloat(valueMatch[1].replace(/\./g, '').replace(',', '.')),
+                            tipo: linha.toLowerCase().includes('débito') ? 'despesa' : 'receita'
+                        });
+                    }
+                }
+            });
+
+            return transacoes;
+        }
+
+        function displayPreview() {
+            const tbody = document.getElementById('previewTable');
+            tbody.innerHTML = extractedTransacoes.map((t, idx) => `
+                <tr>
+                    <td>${t.data}</td>
+                    <td>
+                        <input 
+                            type="text" 
+                            value="${t.descricao}" 
+                            class="form-control"
+                            onchange="extractedTransacoes[${idx}].descricao = this.value"
+                        >
+                    </td>
+                    <td>
+                        <input 
+                            type="number" 
+                            value="${t.valor}" 
+                            step="0.01"
+                            class="form-control"
+                            onchange="extractedTransacoes[${idx}].valor = parseFloat(this.value)"
+                        >
+                    </td>
+                    <td>
+                        <select 
+                            class="form-control"
+                            onchange="extractedTransacoes[${idx}].tipo = this.value"
+                        >
+                            <option value="receita" ${t.tipo === 'receita' ? 'selected' : ''}>Receita</option>
+                            <option value="despesa" ${t.tipo === 'despesa' ? 'selected' : ''}>Despesa</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="removeTransacao(${idx})">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('uploadArea').style.display = 'none';
+            document.getElementById('previewSection').style.display = 'block';
+        }
+
+        function removeTransacao(idx) {
+            extractedTransacoes.splice(idx, 1);
+            displayPreview();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btnConfirmarImportacao').addEventListener('click', importarTransacoes);
+            document.getElementById('btnNovoArquivo').addEventListener('click', resetUpload);
+            document.getElementById('toggleTheme').addEventListener('click', toggleTheme);
+            document.getElementById('logout').addEventListener('click', logout);
+        }
+
+        async function importarTransacoes() {
+            try {
+                const user = await getAuthUser();
+                const { data: obras } = await db.getObras();
+                const { data: categorias } = await db.getCategorias();
+                const { data: formas } = await db.getFormasPagamento();
+
+                // Usar primeira obra e categoria como padrão
+                const obraId = obras[0]?.id;
+                const categoriaId = categorias[0]?.id;
+                const formaId = formas[0]?.id;
+
+                if (!obraId || !categoriaId || !formaId) {
+                    showAlert('Erro: Dados incompletos no banco', 'danger');
+                    return;
+                }
+
+                for (const t of extractedTransacoes) {
+                    const { error } = await db.insertTransacao({
+                        numero_transacao: `IMP.${Date.now()}.${Math.random()}`,
+                        descricao: t.descricao,
+                        valor: t.valor,
+                        data_transacao: t.data,
+                        categoria_id: categoriaId,
+                        forma_pagamento_id: formaId,
+                        obra_id: obraId,
+                        colaborador_id: user.id,
+                        criado_por: user.id,
+                        status: 'registrada'
+                    });
+
+                    if (error) throw error;
+                }
+
+                showAlert(`✅ ${extractedTransacoes.length} transações importadas com sucesso!`, 'success');
+                resetUpload();
+
+            } catch (error) {
+                console.error('Erro ao importar:', error);
+                showAlert('Erro ao importar transações: ' + error.message, 'danger');
+            }
+        }
+
+        function resetUpload() {
+            extractedTransacoes = [];
+            document.getElementById('pdfFile').value = '';
+            document.getElementById('uploadArea').style.display = 'block';
+            document.getElementById('previewSection').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

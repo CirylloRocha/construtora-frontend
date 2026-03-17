@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transações - Gestão Financeira</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h1>📋 Transações</h1>
+        </div>
+        <div class="header-right">
+            <a href="novo-transacao.html" class="btn btn-primary">➕ Nova Transação</a>
+            <button id="toggleTheme" class="btn btn-secondary">🌙 Modo Escuro</button>
+            <button id="logout" class="btn btn-danger">🚪 Sair</button>
+        </div>
+    </header>
+
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li><a href="dashboard.html">📊 Dashboard</a></li>
+            <li><a href="novo-transacao.html">➕ Nova Transação</a></li>
+            <li><a href="transacoes.html" class="active">📋 Transações</a></li>
+            <li><a href="importar-pdf.html">📄 Importar PDF</a></li>
+            <li><a href="relatorios.html">📈 Relatórios</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <!-- Filtros -->
+        <section class="filters-section">
+            <h2>Filtros</h2>
+            <div class="filters-grid">
+                <div class="form-group">
+                    <label for="filterData">Data Inicial</label>
+                    <input type="date" id="filterData">
+                </div>
+
+                <div class="form-group">
+                    <label for="filterDataFim">Data Final</label>
+                    <input type="date" id="filterDataFim">
+                </div>
+
+                <div class="form-group">
+                    <label for="filterCategoria">Categoria</label>
+                    <select id="filterCategoria">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filterObra">Obra</label>
+                    <select id="filterObra">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filterBusca">Buscar</label>
+                    <input 
+                        type="text" 
+                        id="filterBusca" 
+                        placeholder="Descrição ou valor..."
+                    >
+                </div>
+
+                <div class="form-group">
+                    <button id="btnFiltrar" class="btn btn-primary">🔍 Filtrar</button>
+                    <button id="btnLimpar" class="btn btn-secondary">🔄 Limpar</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabela de Transações -->
+        <section class="transactions-section">
+            <div class="section-header">
+                <h2>Lista de Transações</h2>
+                <div class="pagination-info">
+                    <span id="paginationInfo">Página 1</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Obra</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                            <th>Forma Pagamento</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transacoesTable">
+                        <tr>
+                            <td colspan="8" class="text-center">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginação -->
+            <div class="pagination">
+                <button id="btnAnterior" class="btn btn-secondary">← Anterior</button>
+                <span id="pageInfo">Página 1 de 1</span>
+                <button id="btnProximo" class="btn btn-secondary">Próximo →</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal de Edição -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Transação</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="editForm" class="form">
+                <div class="form-group">
+                    <label for="editDescricao">Descrição</label>
+                    <input type="text" id="editDescricao" required>
+                </div>
+                <div class="form-group">
+                    <label for="editValor">Valor</label>
+                    <input type="number" id="editValor" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="editStatus">Status</label>
+                    <select id="editStatus">
+                        <option value="registrada">Registrada</option>
+                        <option value="confirmada">Confirmada</option>
+                        <option value="cancelada">Cancelada</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">✅ Salvar</button>
+                    <button type="button" class="btn btn-secondary modal-close">❌ Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let allTransacoes = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadTransacoes();
+            await loadFilterOptions();
+            setupEventListeners();
+        });
+
+        async function loadTransacoes() {
+            try {
+                const { data, error } = await db.getAllTransacoes();
+                if (error) throw error;
+
+                allTransacoes = data || [];
+                displayTransacoes();
+            } catch (error) {
+                console.error('Erro ao carregar transações:', error);
+                showAlert('Erro ao carregar transações', 'danger');
+            }
+        }
+
+        async function loadFilterOptions() {
+            try {
+                const { data: categorias } = await db.getCategorias();
+                const { data: obras } = await db.getObras();
+
+                const categoriaSelect = document.getElementById('filterCategoria');
+                categoriaSelect.innerHTML = '<option value="">Todas</option>' +
+                    categorias.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+
+                const obraSelect = document.getElementById('filterObra');
+                obraSelect.innerHTML = '<option value="">Todas</option>' +
+                    obras.map(o => `<option value="${o.id}">${o.codigo}</option>`).join('');
+            } catch (error) {
+                console.error('Erro ao carregar filtros:', error);
+            }
+        }
+
+        function displayTransacoes() {
+            const filtered = filterTransacoes();
+            const totalPages = Math.ceil(filtered.length / itemsPerPage);
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const paged = filtered.slice(start, end);
+
+            const tbody = document.getElementById('transacoesTable');
+            tbody.innerHTML = paged.map(t => `
+                <tr>
+                    <td>${formatDate(t.data_transacao)}</td>
+                    <td>${t.descricao}</td>
+                    <td>${t.obras?.codigo || '-'}</td>
+                    <td>${t.categorias?.nome || '-'}</td>
+                    <td class="${t.categorias?.tipo === 'receita' ? 'text-success' : 'text-danger'}">
+                        ${t.categorias?.tipo === 'receita' ? '+' : '-'} ${formatCurrency(t.valor)}
+                    </td>
+                    <td>${t.formas_pagamento?.nome || '-'}</td>
+                    <td><span class="badge badge-${t.status}">${t.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editTransacao('${t.id}')">✏️</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteTransacao('${t.id}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages || 1}`;
+            document.getElementById('paginationInfo').textContent = `${filtered.length} transações encontradas`;
+        }
+
+        function filterTransacoes() {
+            let filtered = allTransacoes;
+
+            const dataInicial = document.getElementById('filterData').value;
+            const dataFinal = document.getElementById('filterDataFim').value;
+            const categoria = document.getElementById('filterCategoria').value;
+            const obra = document.getElementById('filterObra').value;
+            const busca = document.getElementById('filterBusca').value.toLowerCase();
+
+            if (dataInicial) {
+                filtered = filtered.filter(t => t.data_transacao >= dataInicial);
+            }
+            if (dataFinal) {
+                filtered = filtered.filter(t => t.data_transacao &lt;= dataFinal);
+            }
+            if (categoria) {
+                filtered = filtered.filter(t => t.categoria_id === categoria);
+            }
+            if (obra) {
+                filtered = filtered.filter(t => t.obra_id === obra);
+            }
+            if (busca) {
+                filtered = filtered.filter(t => 
+                    t.descricao.toLowerCase().includes(busca) ||
+                    t.valor.toString().includes(busca)
+                );
+            }
+
+            return filtered;
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btnFiltrar').addEventListener('click', () => {
+                currentPage = 1;
+                displayTransacoes();
+            });
+
+            document.getElementById('btnLimpar').addEventListener('click', () => {
+                document.getElementById('filterData').value = '';
+                document.getElementById('filterDataFim').value = '';
+                document.getElementById('filterCategoria').value = '';
+                document.getElementById('filterObra').value = '';
+                document.getElementById('filterBusca').value = '';
+                currentPage = 1;
+                displayTransacoes();
+            });
+
+            document.getElementById('btnProximo').addEventListener('click', () => {
+                const filtered = filterTransacoes();
+                const totalPages = Math.ceil(filtered.length / itemsPerPage);
+                if (currentPage &lt; totalPages) {
+                    currentPage++;
+                    displayTransacoes();
+                }
+            });
+
+            document.getElementById('btnAnterior').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    displayTransacoes();
+                }
+            });
+
+            document.getElementById('toggleTheme').addEventListener('click', toggleTheme);
+            document.getElementById('logout').addEventListener('click', logout);
+
+            // Modal
+            document.querySelector('.modal-close').addEventListener('click', closeModal);
+        }
+
+        async function editTransacao(id) {
+            const transacao = allTransacoes.find(t => t.id === id);
+            if (!transacao) return;
+
+            document.getElementById('editDescricao').value = transacao.descricao;
+            document.getElementById('editValor').value = transacao.valor;
+            document.getElementById('editStatus').value = transacao.status;
+
+            const modal = document.getElementById('editModal');
+            modal.style.display = 'flex';
+
+            document.getElementById('editForm').onsubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const { error } = await db.updateTransacao(id, {
+                        descricao: document.getElementById('editDescricao').value,
+                        valor: parseFloat(document.getElementById('editValor').value),
+                        status: document.getElementById('editStatus').value,
+                        atualizado_por: (await getAuthUser()).id
+                    });
+
+                    if (error) throw error;
+                    showAlert('✅ Transação atualizada!', 'success');
+                    closeModal();
+                    await loadTransacoes();
+                } catch (error) {
+                    showAlert('Erro ao atualizar: ' + error.message, 'danger');
+                }
+            };
+        }
+
+        async function deleteTransacao(id) {
+            if (!confirm('Tem certeza que deseja deletar esta transação?')) return;
+
+            try {
+                const { error } = await db.deleteTransacao(id);
+                if (error) throw error;
+                showAlert('✅ Transação deletada!', 'success');
+                await loadTransacoes();
+            } catch (error) {
+                showAlert('Erro ao deletar: ' + error.message, 'danger');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
